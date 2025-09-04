@@ -1,0 +1,11 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+	--navbar-height: 70px;
+    --content-height: calc(100% - var(--navbar-height));
+	--channel-bar-height: 60px;
+	--channel-input-height: 80px;
+	--channel-body-height: calc(100% - var(--channel-bar-height) - var(--channel-input-height));
+}
