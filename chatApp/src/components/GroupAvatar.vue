@@ -2,19 +2,20 @@
 import axios from 'axios';
 import { ref, onMounted, watch } from 'vue';
 import { useAuthStore } from '@/stores/authStore';
+import type { ChannelMember } from '@/types';
 
 const props = defineProps<{
 	channelId: string | null;
 }>();
 
-const members = ref<any[]>([]);
+const members = ref<ChannelMember[]>([]);
 const authStore = useAuthStore();
 
 const fetchMembers = async () => {
 	if (!props.channelId) return;
 
 	try {
-		const response = await axios.get(`/channels/${props.channelId}/members`);
+		const response = await axios.get<{data:ChannelMember[]}>(`/channels/${props.channelId}/members`);
 		if (!response) {
 			throw new Error('Unable to fetch data');
 		}
@@ -23,7 +24,8 @@ const fetchMembers = async () => {
 
 		// const currentUserId = authStore.auth?.profile.id;
 
-		members.value = response.data;
+		members.value = response.data.data;
+		console.log(members.value)
 	} catch (error) {
 		console.error(error);
 	}

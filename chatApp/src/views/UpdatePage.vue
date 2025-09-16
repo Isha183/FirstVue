@@ -11,7 +11,7 @@ const authStore = useAuthStore();
 
 const displayName = ref<string>('');
 const avatar = ref<HTMLInputElement>();
-const avatarPath = ref<string>(''); 
+const avatarPath = ref<string>('');
 onMounted(() => {
 	displayName.value = authStore.auth?.profile.display_name ?? displayName.value;
 	avatarPath.value = authStore.auth?.profile.avatar_url ?? '';
@@ -35,14 +35,16 @@ async function update(
 		if (oldPassword) formData.append('old_password', oldPassword);
 		if (newPassword) formData.append('new_password', newPassword);
 		if (avatar) formData.append('avatar', avatar);
-		const response = await axios.post<User>('http://localhost:80/api/users/me', formData, {
+		const response = await axios.post<{
+			data: User;
+		}>('http://localhost:80/api/users/me', formData, {
 			headers: { 'Content-Type': 'multipart/form-data' },
 		});
 		if (!response) {
 			throw new Error('Unable to fetch data');
 		}
 
-		authStore.handleProfileUpdate(response.data);
+		authStore.handleProfileUpdate(response.data.data);
 
 		return notify({
 			text: 'Profile update successfully',
@@ -117,7 +119,6 @@ const resetForm = () => {
 						/>
 					</div>
 
-					
 					<div>
 						<label class="block mb-2 text-sm font-medium"> Upload Avatar </label>
 						<input
@@ -185,4 +186,3 @@ const resetForm = () => {
 		</div>
 	</div>
 </template>
-

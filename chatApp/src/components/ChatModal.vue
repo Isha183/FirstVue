@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { User } from '@/types';
+import type { Channel, User } from '@/types';
 import { useNotification } from '@kyvg/vue3-notification';
 import axios from 'axios';
 import {defineProps, ref } from 'vue';
@@ -11,8 +11,7 @@ const props = defineProps<{
 const { notify } = useNotification();
 const searchQuery = ref<string>('');
 const activeTab = ref<'chat' | 'channel'>('chat');
-const emit = defineEmits(['close']);
-
+const emit = defineEmits(['close' , 'chat-started']);
 
 const channelName = ref('');
 const channelDesc = ref('');
@@ -63,9 +62,10 @@ const addUser = () => {
   }
 };
 
-const createChannel = async (channelName: String, channelDesc: string, initial_members: string[]) => {
+const createChannel = async (channelName: string, channelDesc: string, initial_members: string[]) => {
 	try {
-		const response = await axios.post('/channels', {
+		const response = await axios.post<Channel>('/channels', {
+			type:'group',
 			name: channelName,
 			description: channelDesc,
 			initial_members: initial_members,
@@ -77,9 +77,27 @@ const createChannel = async (channelName: String, channelDesc: string, initial_m
 	}
 };
 
-const created = () => {
+const startChat = async (username: String) => {
+	try {
+		const response = await axios.post<Channel>('/channels', {
+			type:'personal',
+			username:username,
+		});
+		notify({
+			text: 'Chat started successfully!',
+			type: 'success'
+		});
+
+		emit('chat-started', response.data);
+	} catch (error) {
+		console.error('Failed to start a chat:', error);
+ 	}
+};
+
+const createdChannel = () => {
 	createChannel(channelName.value, channelDesc.value, initial_members.value);
 };
+
 
 
 const closeModal = () => {
@@ -89,6 +107,7 @@ const closeModal = () => {
 
 <template>
 	<div v-if="open" class=" fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+
 		<div class="bg-white w-[600px] rounded-lg shadow-lg p-6 relative">
 			<button @click="closeModal" class="absolute top-3 right-3 text-gray-600 text-xs">
 				close
@@ -100,14 +119,14 @@ const closeModal = () => {
 					:class="activeTab === 'chat' ? 'border-b-2 border-blue-600 font-bold' : ''"
 					@click="activeTab = 'chat'"
 				>
-					Start Chat
+					One-on-One Chat
 				</button>
 				<button
 					class="flex-1 py-2 text-center"
 					:class="activeTab === 'channel' ? 'border-b-2 border-blue-600 font-bold' : ''"
 					@click="activeTab = 'channel'"
 				>
-					Create Channel
+					Create Group
 				</button>
 			</div>
 
@@ -130,7 +149,7 @@ const closeModal = () => {
 				<ul class="space-y-2 max-h-64 overflow-y-auto">
 					<li class="flex justify-between items-center border-b pb-1">
 						<span>{{ user }}</span>
-						<button class="text-blue-600 hover:underline">Chat</button>
+						<button @click.prevent="startChat(searchQuery)" class="text-blue-600 hover:underline">Chat</button>
 					</li>
 				</ul>
 			</div>
@@ -211,7 +230,7 @@ const closeModal = () => {
 				<button
 					class="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
 					type="button"
-					@click.prevent="created"
+					@click.prevent="createdChannel"
 				>
 					Create Channel
 				</button>

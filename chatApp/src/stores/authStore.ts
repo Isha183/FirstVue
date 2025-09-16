@@ -41,8 +41,10 @@ export const useAuthStore = defineStore('auth', () => {
 			return;
 		}
 		try {
-			const response = await axios.get<User>('http://localhost:80/api/users/me');
-			handleProfileUpdate(response.data);
+			const response = await axios.get<{
+				data: User;
+			}>('http://localhost:80/api/users/me');
+			handleProfileUpdate(response.data.data);
 		} catch (error) {
 			console.error('error', error);
 		}

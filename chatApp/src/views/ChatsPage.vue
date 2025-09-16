@@ -1,18 +1,12 @@
 <script setup lang="ts">
 import Header from '@/components/NavBar.vue';
-import router from '@/router';
 import axios from 'axios';
 import { onMounted, ref } from 'vue';
 import { useAuthStore } from '@/stores/authStore';
 import ChatModal from '../components/ChatModal.vue';
 import ManageChannelModal from '@/components/ManageChannelModal.vue';
 import GroupAvatar from '@/components/GroupAvatar.vue';
-
-
-type Channel = {
-	id: string;
-	name: string;
-};
+import type { Channel, Media, Message } from '@/types';
 
 const showChannelMenu = ref(false);
 const isOwner = ref(false);
@@ -58,45 +52,53 @@ const authStore = useAuthStore();
 
 const channels = ref<Channel[]>();
 const selectedChannel = ref<Channel | null>(null);
-const messages = ref<any[]>([]);
+const messages = ref<Message[]>([]);
 const newMessage = ref<string>('');
 const author = ref<string | null>(null);
+const messageId = ref<string>();
 
 const sendMessage = async () => {
 	if (!selectedChannel.value) return;
 
 	try {
-		const attachments = <string[]>[];
+		const attachments = <Media[]>[];
 		if (media.value) {
 			for (let i of media.value) {
 				const tempMediaId = await sendMedia(i);
-				attachments.push(tempMediaId);
+				if(tempMediaId){
+					attachments.push(tempMediaId);
+				}
+				
 			}
 			media.value = null;
 		}
-		const response = await axios.post(`/channels/${selectedChannel.value.id}/messages`, {
-			content: newMessage.value,
-			attachment_ids: attachments,
-		});
-		messages.value.push(response.data);
-		console.log(messages.value);
+		const response = await axios.post<{data:Message}>(
+			`/channels/${selectedChannel.value.id}/messages`,
+			{
+				content: newMessage.value,
+				attachment_ids: attachments,
+			},
+		);
+		messages.value?.push(response.data.data);
+		messageId.value = response.data.data.id;
+		
 		newMessage.value = '';
 	} catch (error) {
 		console.error(error);
 	}
 };
 
-const selectChannel = async (channel: Channel) => {
+const selectChannel = async (channel: Channel): Promise<void> => {
 	selectedChannel.value = channel;
 
 	try {
-		const res = await axios.get(`/channels/${channel.id}`);
-		isOwner.value = res.data.owner_id === author.value;
+		const res = await axios.get<{data:Channel}>(`/channels/${channel.id}`);
+		isOwner.value = res.data.data.owner_id === author.value;
 
-		const response = await axios.get(`/channels/${channel.id}/messages`);
-		messages.value = response.data.messages;
+		const response = await axios.get<{ data: Message[] }>(`/channels/${channel.id}/messages`);
+		messages.value = response.data.data;
 	} catch (error) {
-		console.error(error);
+		console.error('Failed to select channel:', error);
 	}
 };
 
@@ -106,27 +108,36 @@ const sendMedia = async (media: File) => {
 	try {
 		const formData = new FormData();
 		formData.append('file', media);
-		const response = await axios.post('/media/temp', formData, {
+		const response = await axios.post<{data:Media}>('/media/temp', formData, {
 			headers: { 'Content-Type': 'multipart/form-data' },
 		});
 		if (!response) {
 			throw new Error('Unable to fetch data');
 		}
 
-		return response.data.id;
+		return response.data.data;
 	} catch (error) {
 		console.error(error);
 	}
 };
 
+// const deleteMessage = async()=>{
+// 	if (!selectedChannel.value) return;
+// 	try{
+// 		const response=axios.delete(`/channels/${selectedChannel.value.id}/messages/`)
+// 	}catch(error){
+// 		console.log(error);
+// 	}
+// }
+
 const showChannels = async () => {
 	try {
-		const response = await axios.get('/channels');
+		const response = await axios.get<{ data: Channel[] }>('/channels');
 		if (!response) {
 			throw new Error('Unable to fetch data');
 		}
-		channels.value = response.data;
-		return response.data;
+		channels.value = response.data.data;
+		return response.data.data;
 	} catch (error) {
 		console.log(error);
 	}
@@ -146,11 +157,19 @@ const getDate = (date: string) => {
 	const yesterday = new Date();
 	console.log(yesterday);
 	yesterday.setDate(today.getDate() - 1);
-	console.log(yesterday.setDate(today.getDate() - 1));
 
 	if (msgDay === todayDay) return 'Today';
 	if (msgDay === yesterday.toDateString()) return 'Yesterday';
 	return msgDate.toLocaleDateString();
+};
+
+const handleChatStarted = (channel: Channel) => {
+	if (!channels.value) {
+		channels.value = [];
+	}
+	channels.value.push(channel);
+	selectedChannel.value = channel;
+	startchat.value = false;
 };
 
 // const showMessages = async () => {
@@ -175,7 +194,7 @@ const getDate = (date: string) => {
 onMounted(() => {
 	showChannels();
 	author.value = authStore.auth?.profile.id ?? null;
-	console.log(author.value);
+
 });
 </script>
 
@@ -187,7 +206,7 @@ onMounted(() => {
 			:channel-id="selectedChannel?.id ?? null"
 			@close="manageModalOpen = false"
 		/>
-		<ChatModal :open="startchat" @close="startchat = false" />
+		<ChatModal :open="startchat" @close="startchat = false" @chat-started="handleChatStarted" />
 
 		<div class="flex grow overflow-y-auto" style="max-height: var(--content-height)">
 			<!-- left side -->
@@ -260,7 +279,7 @@ onMounted(() => {
 									@click="leaveChannel"
 									class="block w-full text-left px-4 py-2 hover:bg-gray-100"
 								>
-									Leave Channel
+									Leave Chat
 								</button>
 
 								<button

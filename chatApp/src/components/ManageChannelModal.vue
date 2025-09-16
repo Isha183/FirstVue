@@ -33,7 +33,7 @@ const fetchMembers = async () => {
 	if (!props.channelId) return;
 	try {
 		const response = await axios.get(`/channels/${props.channelId}/members`);
-		members.value = response.data;
+		members.value = response.data.data;
 	} catch (error) {
 		console.error(error);
 	}
