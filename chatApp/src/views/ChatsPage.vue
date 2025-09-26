@@ -1,25 +1,49 @@
 <script setup lang="ts">
 import Header from '@/components/NavBar.vue';
 import axios from 'axios';
-import { onMounted, ref } from 'vue';
+import { computed, ref } from 'vue';
 import { useAuthStore } from '@/stores/authStore';
 import ChatModal from '../components/ChatModal.vue';
 import ManageChannelModal from '@/components/ManageChannelModal.vue';
 import GroupAvatar from '@/components/GroupAvatar.vue';
 import type { Channel, Media, Message } from '@/types';
-import { useChatStore } from '@/stores/chatStore';
+import { useQuery, useQueryClient } from '@tanstack/vue-query';
 
 const authStore = useAuthStore();
-const chatStore = useChatStore();
+const queryClient = useQueryClient();
 
-const channels = ref<Channel[]>();
 const selectedChannel = ref<Channel | null>(null);
-const messages = ref<Message[]>([]);
+
+const {
+	isLoading: isLoadingChannels,
+	data: channels,
+	error: channelsError,
+	refetch: refetchChannels,
+} = useQuery({
+	queryKey: computed(() => ['channels', 'list']),
+	queryFn: () => axios.get<{ data: Channel[] }>('/channels').then((r) => r.data?.data),
+});
+
+const {
+	isLoading: isLoadingMessages,
+	data: messages,
+	error: messagesError,
+} = useQuery({
+	queryKey: computed(() => ['channels', 'detail', selectedChannel.value, 'messages']),
+	queryFn: () =>
+		axios
+			.get<{ data: Message[] }>(`/channels/${selectedChannel.value?.id}/messages`)
+			.then((r) => r.data.data),
+	enabled: computed(() => !!selectedChannel.value),
+});
+
+const isOwner = computed(() => selectedChannel.value?.owner_id === authStore.auth?.profile.id);
+const author = computed(() => authStore.auth?.profile.id);
+
 const newMessage = ref<string>('');
-const author = ref<string | null>(null);
+
 const messageId = ref<string>();
 const showChannelMenu = ref(false);
-const isOwner = ref(false);
 const manageModalOpen = ref(false);
 const media = ref<File[] | null>();
 const startchat = ref<boolean>(false);
@@ -58,8 +82,7 @@ const leaveChannel = async () => {
 		alert('You left the channel');
 		showChannelMenu.value = false;
 		selectedChannel.value = null;
-		chatStore.channels();
-		channels.value = chatStore.chats ?? null;
+		refetchChannels();
 	} catch (error) {
 		console.error(error);
 	}
@@ -91,8 +114,17 @@ const sendMessage = async () => {
 				attachment_ids: attachments,
 			},
 		);
-		messages.value?.push(response.data.data);
-		messageId.value = response.data.data.id;
+		queryClient.setQueryData(
+			['channels', 'detail', selectedChannel.value, 'messages'],
+			(oldMessages: Message[]) => {
+				if(!oldMessages){
+					return [response.data.data];
+				}
+				return  [...oldMessages, response.data.data];
+			},
+		);
+		// messages.value?.push(response.data.data);
+		// messageId.value = response.data.data.id;
 
 		newMessage.value = '';
 	} catch (error) {
@@ -100,18 +132,8 @@ const sendMessage = async () => {
 	}
 };
 
-const selectChannel = async (channel: Channel): Promise<void> => {
+const selectChannel = (channel: Channel) => {
 	selectedChannel.value = channel;
-
-	try {
-		const res = await axios.get<{ data: Channel }>(`/channels/${channel.id}`);
-		isOwner.value = res.data.data.owner_id === author.value;
-
-		const response = await axios.get<{ data: Message[] }>(`/channels/${channel.id}/messages`);
-		messages.value = response.data.data;
-	} catch (error) {
-		console.error('Failed to select channel:', error);
-	}
 };
 
 const sendMedia = async (media: File) => {
@@ -175,12 +197,18 @@ const getDate = (date: string) => {
 	return msgDate.toLocaleDateString();
 };
 
-const handleChatStarted = (channel: Channel) => {
-	if (!channels.value) {
-		channels.value = [];
-	}
-	channels.value.push(channel);
-	selectedChannel.value = channel;
+const handleChatStarted = (newChannel: Channel) => {
+	queryClient.setQueryData(['channels', 'list'], (oldChannels: Channel[]) => {
+		if (!oldChannels) {
+			return [newChannel];
+		}
+
+		return [...oldChannels, newChannel];
+	});
+
+	// channels.push(channel);
+	selectedChannel.value = newChannel;
+	refetchChannels();
 	startchat.value = false;
 };
 
@@ -202,12 +230,6 @@ const handleChatStarted = (channel: Channel) => {
 // 		console.log(error);
 // 	}
 // };
-
-onMounted(() => {
-	chatStore.channels();
-	channels.value = chatStore.chats ?? null;
-	author.value = authStore.auth?.profile.id ?? null;
-});
 </script>
 
 <template>

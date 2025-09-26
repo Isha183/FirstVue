@@ -5,6 +5,7 @@ import 'vue-toast-notification/dist/theme-bootstrap.css';
 import Notifications from '@kyvg/vue3-notification';
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
+import { VueQueryPlugin } from '@tanstack/vue-query'
 
 import axios from 'axios';
 axios.defaults.baseURL = import.meta.env.VITE_API_URL;
@@ -18,5 +19,6 @@ app.use(createPinia());
 app.use(ToastPlugin);
 app.use(router);
 app.use(Notifications);
+app.use(VueQueryPlugin)
 
 app.mount('#app');

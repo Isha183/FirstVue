@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import type { Channel, User } from '@/types';
 import { useNotification } from '@kyvg/vue3-notification';
+import { useQuery } from '@tanstack/vue-query';
 import axios from 'axios';
-import {defineProps, ref } from 'vue';
+import { computed, defineProps, ref } from 'vue';
 
 const props = defineProps<{
 	open: boolean;
@@ -11,38 +12,57 @@ const props = defineProps<{
 const { notify } = useNotification();
 const searchQuery = ref<string>('');
 const activeTab = ref<'chat' | 'channel'>('chat');
-const emit = defineEmits(['close' , 'chat-started']);
+const emit = defineEmits(['close', 'chat-started']);
 
 const channelName = ref('');
+const onSearch = ref('');
 const channelDesc = ref('');
 const showAddUsersModal = ref(false);
 const initial_members = ref<string[]>([]);
 const user = ref<string>();
 
-const fetchUsers = async (username: string) => {
-	try {
-		const response = await axios.get<User>('/allusers', {
-			params: { username: username },
+const {
+	isLoading: isLoadingUsers,
+	data: users,
+	error: usersError,
+	refetch: refetchUsers,
+} = useQuery({
+	queryKey: computed(() => ['users', searchQuery.value]),
+	queryFn: async () => {
+		const response = await axios.get<{ data: User }>('/allusers', {
+			params: { username: searchQuery.value },
 		});
-		if (!response) {
-			throw new Error('Unable to fetch data');
-		}
-		user.value = response.data.data.username;
-    
-		if (!user.value) {
-			return notify({
-				text: 'User does not exist',
-				type: 'error',
-			});
-		}
-	} catch (err) {
-		console.error('Failed to fetch users:', err);
-	}
-};
+		return response.data.data;
+	},
+	enabled: computed(() => props.open && !!searchQuery.value),
+});
 
-const fetchCall = () => {
-	fetchUsers(searchQuery.value);
-};
+onSearch.value = searchQuery.value;
+
+// const fetchUsers = async (username: string) => {
+// 	try {
+// 		const response = await axios.get<User>('/allusers', {
+// 			params: { username: username },
+// 		});
+// 		if (!response) {
+// 			throw new Error('Unable to fetch data');
+// 		}
+// 		user.value = response.data.data.username;
+
+// 		if (!user.value) {
+// 			return notify({
+// 				text: 'User does not exist',
+// 				type: 'error',
+// 			});
+// 		}
+// 	} catch (err) {
+// 		console.error('Failed to fetch users:', err);
+// 	}
+// };
+
+// const fetchCall = () => {
+// 	fetchUsers(searchQuery.value);
+// };
 
 const openAddUsersModal = () => {
 	if (!channelName.value.trim()) {
@@ -50,22 +70,24 @@ const openAddUsersModal = () => {
 		return;
 	}
 	showAddUsersModal.value = true;
-  
 };
 
 const addUser = () => {
-  
 	if (user.value) {
 		initial_members.value = [...initial_members.value, user.value];
-	}else{
-    return 'no user stored'
-  }
+	} else {
+		return 'no user stored';
+	}
 };
 
-const createChannel = async (channelName: string, channelDesc: string, initial_members: string[]) => {
+const createChannel = async (
+	channelName: string,
+	channelDesc: string,
+	initial_members: string[],
+) => {
 	try {
 		const response = await axios.post<Channel>('/channels', {
-			type:'group',
+			type: 'group',
 			name: channelName,
 			description: channelDesc,
 			initial_members: initial_members,
@@ -80,25 +102,23 @@ const createChannel = async (channelName: string, channelDesc: string, initial_m
 const startChat = async (username: String) => {
 	try {
 		const response = await axios.post<Channel>('/channels', {
-			type:'personal',
-			username:username,
+			type: 'personal',
+			username: username,
 		});
 		notify({
 			text: 'Chat started successfully!',
-			type: 'success'
+			type: 'success',
 		});
 
 		emit('chat-started', response.data);
 	} catch (error) {
 		console.error('Failed to start a chat:', error);
- 	}
+	}
 };
 
 const createdChannel = () => {
 	createChannel(channelName.value, channelDesc.value, initial_members.value);
 };
-
-
 
 const closeModal = () => {
 	emit('close');
@@ -106,8 +126,10 @@ const closeModal = () => {
 </script>
 
 <template>
-	<div v-if="open" class=" fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-
+	<div
+		v-if="open"
+		class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
+	>
 		<div class="bg-white w-[600px] rounded-lg shadow-lg p-6 relative">
 			<button @click="closeModal" class="absolute top-3 right-3 text-gray-600 text-xs">
 				close
@@ -139,7 +161,7 @@ const closeModal = () => {
 					/>
 					<button
 						type="button"
-						@click.prevent="fetchCall"
+						@click.prevent="refetchUsers()"
 						class="bg-blue-600 px-4 rounded-r text-white"
 					>
 						<i class="pi pi-search"></i>
@@ -147,9 +169,14 @@ const closeModal = () => {
 				</div>
 
 				<ul class="space-y-2 max-h-64 overflow-y-auto">
-					<li class="flex justify-between items-center border-b pb-1">
-						<span>{{ user }}</span>
-						<button @click.prevent="startChat(searchQuery)" class="text-blue-600 hover:underline">Chat</button>
+					<li v-if="users" class="flex justify-between items-center border-b pb-1">
+						<span>{{ users.username }}</span>
+						<button
+							@click.prevent="startChat(users.username)"
+							class="text-blue-600 hover:underline"
+						>
+							Chat
+						</button>
 					</li>
 				</ul>
 			</div>
@@ -206,7 +233,7 @@ const closeModal = () => {
 						/>
 						<button
 							type="button"
-							@click.prevent="fetchCall"
+							@click.prevent="refetchUsers()"
 							class="bg-blue-600 px-4 rounded-r text-white"
 						>
 							<i class="pi pi-search"></i>
@@ -238,21 +265,3 @@ const closeModal = () => {
 		</div>
 	</div>
 </template>
-
-<!-- const createChannel = async () => {
-	try {
-		await axios.post('/api/channels', {
-			name: channelName.value,
-			description: channelDesc.value,
-			users: selectedUsers.value, // array of user IDs
-		});
-		alert('Channel created successfully!');
-		showAddUsersModal.value = false;
-		channelName.value = '';
-		channelDesc.value = '';
-		selectedUsers.value = [];
-		router.push('/chats');
-	} catch (err) {
-		console.error('Failed to create channel:', err);
-	}
-}; -->
