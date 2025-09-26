@@ -7,7 +7,17 @@ import ChatModal from '../components/ChatModal.vue';
 import ManageChannelModal from '@/components/ManageChannelModal.vue';
 import GroupAvatar from '@/components/GroupAvatar.vue';
 import type { Channel, Media, Message } from '@/types';
+import { useChatStore } from '@/stores/chatStore';
 
+const authStore = useAuthStore();
+const chatStore = useChatStore();
+
+const channels = ref<Channel[]>();
+const selectedChannel = ref<Channel | null>(null);
+const messages = ref<Message[]>([]);
+const newMessage = ref<string>('');
+const author = ref<string | null>(null);
+const messageId = ref<string>();
 const showChannelMenu = ref(false);
 const isOwner = ref(false);
 const manageModalOpen = ref(false);
@@ -31,6 +41,16 @@ const onAttachments = (event: Event) => {
 	}
 };
 
+const getChannelDisplayName = (channel: Channel) => {
+	if (channel.type === 'personal') {
+		const otherMember = channel.members?.find(
+			(member) => member.user.id !== authStore.auth?.profile.id,
+		);
+		return otherMember?.user.username;
+	}
+	return channel.name;
+};
+
 const leaveChannel = async () => {
 	if (!selectedChannel.value) return;
 	try {
@@ -38,6 +58,8 @@ const leaveChannel = async () => {
 		alert('You left the channel');
 		showChannelMenu.value = false;
 		selectedChannel.value = null;
+		chatStore.channels();
+		channels.value = chatStore.chats ?? null;
 	} catch (error) {
 		console.error(error);
 	}
@@ -48,15 +70,6 @@ const openManageModal = () => {
 	showChannelMenu.value = false;
 };
 
-const authStore = useAuthStore();
-
-const channels = ref<Channel[]>();
-const selectedChannel = ref<Channel | null>(null);
-const messages = ref<Message[]>([]);
-const newMessage = ref<string>('');
-const author = ref<string | null>(null);
-const messageId = ref<string>();
-
 const sendMessage = async () => {
 	if (!selectedChannel.value) return;
 
@@ -65,14 +78,13 @@ const sendMessage = async () => {
 		if (media.value) {
 			for (let i of media.value) {
 				const tempMediaId = await sendMedia(i);
-				if(tempMediaId){
+				if (tempMediaId) {
 					attachments.push(tempMediaId);
 				}
-				
 			}
 			media.value = null;
 		}
-		const response = await axios.post<{data:Message}>(
+		const response = await axios.post<{ data: Message }>(
 			`/channels/${selectedChannel.value.id}/messages`,
 			{
 				content: newMessage.value,
@@ -81,7 +93,7 @@ const sendMessage = async () => {
 		);
 		messages.value?.push(response.data.data);
 		messageId.value = response.data.data.id;
-		
+
 		newMessage.value = '';
 	} catch (error) {
 		console.error(error);
@@ -92,7 +104,7 @@ const selectChannel = async (channel: Channel): Promise<void> => {
 	selectedChannel.value = channel;
 
 	try {
-		const res = await axios.get<{data:Channel}>(`/channels/${channel.id}`);
+		const res = await axios.get<{ data: Channel }>(`/channels/${channel.id}`);
 		isOwner.value = res.data.data.owner_id === author.value;
 
 		const response = await axios.get<{ data: Message[] }>(`/channels/${channel.id}/messages`);
@@ -108,7 +120,7 @@ const sendMedia = async (media: File) => {
 	try {
 		const formData = new FormData();
 		formData.append('file', media);
-		const response = await axios.post<{data:Media}>('/media/temp', formData, {
+		const response = await axios.post<{ data: Media }>('/media/temp', formData, {
 			headers: { 'Content-Type': 'multipart/form-data' },
 		});
 		if (!response) {
@@ -130,18 +142,18 @@ const sendMedia = async (media: File) => {
 // 	}
 // }
 
-const showChannels = async () => {
-	try {
-		const response = await axios.get<{ data: Channel[] }>('/channels');
-		if (!response) {
-			throw new Error('Unable to fetch data');
-		}
-		channels.value = response.data.data;
-		return response.data.data;
-	} catch (error) {
-		console.log(error);
-	}
-};
+// const showChannels = async () => {
+// 	try {
+// 		const response = await axios.get<{ data: Channel[] }>('/channels');
+// 		if (!response) {
+// 			throw new Error('Unable to fetch data');
+// 		}
+// 		channels.value = response.data.data;
+// 		return response.data.data;
+// 	} catch (error) {
+// 		console.log(error);
+// 	}
+// };
 
 const getDate = (date: string) => {
 	const msgDate = new Date(date);
@@ -192,9 +204,9 @@ const handleChatStarted = (channel: Channel) => {
 // };
 
 onMounted(() => {
-	showChannels();
+	chatStore.channels();
+	channels.value = chatStore.chats ?? null;
 	author.value = authStore.auth?.profile.id ?? null;
-
 });
 </script>
 
@@ -232,9 +244,9 @@ onMounted(() => {
 							'hover:underline': selectedChannel?.id !== channel.id,
 						}"
 					>
-						<GroupAvatar :channel-id="channel?.id ?? null" />
+						<GroupAvatar :members="channel.members ?? []" />
 
-						{{ channel.name }}
+						{{ getChannelDisplayName(channel) }}
 					</button>
 				</div>
 
@@ -251,16 +263,19 @@ onMounted(() => {
 			<div class="bg-light-grey w-full flex flex-col">
 				<template v-if="selectedChannel" class="flex flex-col w-full">
 					<!-- header -->
+
 					<div
 						class="flex flex-row justify-center border-b-2 border-gray-300"
 						style="height: var(--channel-bar-height)"
 					>
-						<GroupAvatar :channel-id="selectedChannel?.id ?? null" />
+						<GroupAvatar :members="selectedChannel.members ?? []" />
+
 						<h2
 							class="text-xl font-semibold text-gray-800 border-b border-5 border-solid border-white p-3"
 						>
-							{{ selectedChannel.name }}
+							{{ getChannelDisplayName(selectedChannel) }}
 						</h2>
+
 						<div class="mt-3 ml-auto">
 							<button
 								type="button"

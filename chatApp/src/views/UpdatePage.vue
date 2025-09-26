@@ -9,6 +9,7 @@ import type { User } from '@/types';
 const { notify } = useNotification();
 const authStore = useAuthStore();
 
+const email = ref<string>('');
 const displayName = ref<string>('');
 const avatar = ref<HTMLInputElement>();
 const avatarPath = ref<string>('');
@@ -27,6 +28,7 @@ async function update(
 	displayName: string,
 	oldPassword: string,
 	newPassword: string,
+	email: string,
 	avatar: undefined | File | null,
 ) {
 	try {
@@ -34,6 +36,7 @@ async function update(
 		formData.append('display_name', displayName);
 		if (oldPassword) formData.append('old_password', oldPassword);
 		if (newPassword) formData.append('new_password', newPassword);
+		if (email) formData.append('email', email);
 		if (avatar) formData.append('avatar', avatar);
 		const response = await axios.post<{
 			data: User;
@@ -72,13 +75,15 @@ const checkPass = async () => {
 			displayName.value.trim(),
 			oldPassword.value.trim(),
 			newPassword.value.trim(),
+			email.value.trim(),
 			avatar.value?.files?.item(0),
 		);
 	}
 };
 
 const resetForm = () => {
-	displayName.value = authStore.auth?.profile.display_name ?? '';
+	displayName.value = '';
+	email.value = '';
 	oldPassword.value = '';
 	newPassword.value = '';
 	if (avatar.value) avatar.value.value = '';
@@ -105,7 +110,7 @@ const resetForm = () => {
 				</h2>
 			</div>
 
-			<!--RIght Side content-->
+			<!--Right Side content-->
 			<main class="grow bg-light-grey p-20">
 				<h2 class="text-lg font-semibold text-gray-800 mb-6">Update Profile</h2>
 
@@ -115,6 +120,15 @@ const resetForm = () => {
 							v-model="displayName"
 							type="text"
 							placeholder="Display Name"
+							class="w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+						/>
+					</div>
+
+					<div>
+						<input
+							v-model="email"
+							type="email"
+							placeholder="Enter Email"
 							class="w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
 						/>
 					</div>

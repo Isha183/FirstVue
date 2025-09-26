@@ -17,6 +17,7 @@ const handlelogout = () => {
 const avatarPath = ref<string>('');
 onMounted(() => {
 	avatarPath.value = authStore.auth?.profile.avatar_url ?? '';
+	
 });
 
 const toggleMenu = () => {

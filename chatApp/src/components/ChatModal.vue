@@ -27,7 +27,7 @@ const fetchUsers = async (username: string) => {
 		if (!response) {
 			throw new Error('Unable to fetch data');
 		}
-		user.value = response.data.username;
+		user.value = response.data.data.username;
     
 		if (!user.value) {
 			return notify({

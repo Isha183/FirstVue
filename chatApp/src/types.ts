@@ -1,4 +1,5 @@
 export type User = {
+	data: any;
 	id: string;
 	username: string;
 	password: string;
@@ -13,6 +14,7 @@ export type Channel = {
 	owner_id: string;
 	member_count: number;
 	type: string;
+	members?: ChannelMember[];
 };
 
 export type ChannelMember = {
@@ -36,7 +38,7 @@ export type Media = {
 	filename: string;
 	content_type: string;
 	size: number;
-	url:string
+	url: string;
 };
 
 export type Message = {

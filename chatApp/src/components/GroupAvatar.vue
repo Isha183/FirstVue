@@ -1,49 +1,26 @@
 <script setup lang="ts">
-import axios from 'axios';
-import { ref, onMounted, watch } from 'vue';
 import { useAuthStore } from '@/stores/authStore';
 import type { ChannelMember } from '@/types';
 
 const props = defineProps<{
-	channelId: string | null;
+	members: ChannelMember[];
 }>();
 
-const members = ref<ChannelMember[]>([]);
 const authStore = useAuthStore();
-
-const fetchMembers = async () => {
-	if (!props.channelId) return;
-
-	try {
-		const response = await axios.get<{data:ChannelMember[]}>(`/channels/${props.channelId}/members`);
-		if (!response) {
-			throw new Error('Unable to fetch data');
-		}
-
-		// const allMembers = response.data;
-
-		// const currentUserId = authStore.auth?.profile.id;
-
-		members.value = response.data.data;
-		console.log(members.value)
-	} catch (error) {
-		console.error(error);
-	}
-};
-
-onMounted(fetchMembers);
 </script>
 
 <template>
-	<div class="flex -space-x-4 p-2 ">
+	<div class="flex -space-x-4 p-2">
 		<template v-for="(member, index) in members.slice(0, 5)" :key="member.user.id">
-			<img
-				v-if="member.user.avatar_url && member.user.avatar_url.trim() !== ''"
-				:src="member.user.avatar_url"
-				class="w-8 h-8 rounded-full border-2 border-black object-cover"
-				:title="member.user.username"
-			/>
-            <i v-else class="pi pi-user"></i>
+			<div v-if="member.user.id !== authStore.auth?.profile.id">
+				<img
+					v-if="member.user.avatar_url && member.user.avatar_url.trim() !== ''"
+					:src="member.user.avatar_url"
+					class="w-8 h-8 rounded-full border-2 border-black object-cover"
+					:title="member.user.username"
+				/>
+				<i v-else class="pi pi-user"></i>
+			</div>
 		</template>
 
 		<div

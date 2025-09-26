@@ -51,7 +51,15 @@ const addMember = async (username: string[]) => {
 };
 const removeMember = async () => {
 	try {
-		await axios.delete(`/channels/${props.channelId}/members/${username.value}`);
+		const member = members.value.find((m) => m.user.username === username.value);
+
+		if (!member) {
+			alert('User not found!');
+			return;
+		}
+
+		const userId = member.user.id;
+		await axios.delete(`/channels/${props.channelId}/members/${userId}`);
 		fetchMembers();
 		modalMode.value = 'none';
 		alert('Removed Member');
@@ -230,7 +238,10 @@ const changeOwner = async (username: string) => {
 				</button>
 			</div>
 
-			<div v-if="verification === true" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 text-center">
+			<div
+				v-if="verification === true"
+				class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 text-center"
+			>
 				<div class="bg-white w-[600px] rounded-lg shadow-lg p-6 relative">
 					<h5>Do you want to delete the channel?</h5>
 					<div class="flex space-x-4 justify-center mt-3">
