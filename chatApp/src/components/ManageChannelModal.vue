@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useAuthStore } from '@/stores/authStore';
+import { useMutation } from '@tanstack/vue-query';
 import axios from 'axios';
 import { defineProps, defineEmits, ref, onMounted } from 'vue';
 
@@ -39,52 +40,91 @@ const fetchMembers = async () => {
 	}
 };
 
-const addMember = async (username: string[]) => {
-	try {
+const { mutateAsync: addMember, isPending:isAddingMember } = useMutation({
+	mutationFn: async (username: string[]) => {
 		await axios.post(`/channels/${props.channelId}/members`, {
 			username: username,
 		});
-		alert('Added Member');
-	} catch (error) {
-		console.log(error);
-	}
-};
-const removeMember = async () => {
-	try {
-		const member = members.value.find((m) => m.user.username === username.value);
+	},
+});
 
+// const addMember = async (username: string[]) => {
+// 	try {
+// 		await axios.post(`/channels/${props.channelId}/members`, {
+// 			username: username,
+// 		});
+// 		alert('Added Member');
+// 	} catch (error) {
+// 		console.log(error);
+// 	}
+// };
+
+const { mutateAsync: removeMember, isPending:isRemovingMember } = useMutation({
+	mutationFn: async () => {
+		const member = members.value.find((m) => m.user.username === username.value);
 		if (!member) {
 			alert('User not found!');
 			return;
 		}
-
 		const userId = member.user.id;
 		await axios.delete(`/channels/${props.channelId}/members/${userId}`);
 		fetchMembers();
 		modalMode.value = 'none';
-		alert('Removed Member');
-	} catch (error) {
-		console.log(error);
-	}
-};
-const deleteChannel = async () => {
-	try {
+	},
+});
+
+// const removeMember = async () => {
+// 	try {
+// 		const member = members.value.find((m) => m.user.username === username.value);
+
+// 		if (!member) {
+// 			alert('User not found!');
+// 			return;
+// 		}
+
+// 		const userId = member.user.id;
+// 		await axios.delete(`/channels/${props.channelId}/members/${userId}`);
+// 		fetchMembers();
+// 		modalMode.value = 'none';
+// 		alert('Removed Member');
+// 	} catch (error) {
+// 		console.log(error);
+// 	}
+// };
+
+const { mutateAsync: deleteChannel, isPending:isdeletingChannel } = useMutation({
+	mutationFn: async () => {
 		await axios.delete(`/channels/${props.channelId}`);
-		alert('Channel deleted');
-	} catch (error) {
-		console.log(error);
-	}
-};
-const changeOwner = async (username: string) => {
-	try {
+	},
+});
+
+// const deleteChannel = async () => {
+// 	try {
+// 		await axios.delete(`/channels/${props.channelId}`);
+// 		alert('Channel deleted');
+// 	} catch (error) {
+// 		console.log(error);
+// 	}
+// };
+
+const { mutateAsync: changeOwner, isPending:isChangingOwner } = useMutation({
+	mutationFn: async (username: string) => {
 		await axios.post(`/channels/${props.channelId}/ownership`, {
 			username: username,
 		});
-		return;
-	} catch (error) {
-		console.log(error);
-	}
-};
+	},
+});
+
+// const changeOwner = async (username: string) => {
+// 	try {
+// 		await axios.post(`/channels/${props.channelId}/ownership`, {
+// 			username: username,
+// 		});
+// 		return;
+// 	} catch (error) {
+// 		console.log(error);
+// 	}
+// };
 </script>
 
 <template>
@@ -204,7 +244,7 @@ const changeOwner = async (username: string) => {
 						<h5>Do you want to remove the user?</h5>
 						<div class="flex space-x-4 justify-center mt-3">
 							<button
-								@click="removeMember"
+								@click.prevent="removeMember()"
 								class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
 							>
 								Yes
@@ -246,7 +286,7 @@ const changeOwner = async (username: string) => {
 					<h5>Do you want to delete the channel?</h5>
 					<div class="flex space-x-4 justify-center mt-3">
 						<button
-							@click="deleteChannel"
+							@click="deleteChannel()"
 							class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
 						>
 							Yes

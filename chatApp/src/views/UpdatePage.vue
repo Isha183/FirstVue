@@ -5,6 +5,7 @@ import { useNotification } from '@kyvg/vue3-notification';
 import { useAuthStore } from '@/stores/authStore';
 import axios from 'axios';
 import type { User } from '@/types';
+import { useMutation } from '@tanstack/vue-query';
 
 const { notify } = useNotification();
 const authStore = useAuthStore();
@@ -24,14 +25,14 @@ const showNewPassword = ref<boolean>(false);
 const oldPassword = ref<string>('');
 const newPassword = ref<string>('');
 
-async function update(
-	displayName: string,
-	oldPassword: string,
-	newPassword: string,
-	email: string,
-	avatar: undefined | File | null,
-) {
-	try {
+const { mutateAsync: updateProfile, isPending: isUpdatingProfile } = useMutation({
+	mutationFn: async (
+		{displayName,oldPassword,newPassword,email,avatar}:{displayName: string,
+		oldPassword: string,
+		newPassword: string,
+		email: string,
+		avatar: undefined | File | null,}
+	) => {
 		const formData = new FormData();
 		formData.append('display_name', displayName);
 		if (oldPassword) formData.append('old_password', oldPassword);
@@ -53,10 +54,42 @@ async function update(
 			text: 'Profile update successfully',
 			type: 'success',
 		});
-	} catch (error) {
-		console.log(error);
-	}
-}
+	},
+});
+
+// async function update(
+// 	displayName: string,
+// 	oldPassword: string,
+// 	newPassword: string,
+// 	email: string,
+// 	avatar: undefined | File | null,
+// ) {
+// 	try {
+// 		const formData = new FormData();
+// 		formData.append('display_name', displayName);
+// 		if (oldPassword) formData.append('old_password', oldPassword);
+// 		if (newPassword) formData.append('new_password', newPassword);
+// 		if (email) formData.append('email', email);
+// 		if (avatar) formData.append('avatar', avatar);
+// 		const response = await axios.post<{
+// 			data: User;
+// 		}>('http://localhost:80/api/users/me', formData, {
+// 			headers: { 'Content-Type': 'multipart/form-data' },
+// 		});
+// 		if (!response) {
+// 			throw new Error('Unable to fetch data');
+// 		}
+
+// 		authStore.handleProfileUpdate(response.data.data);
+
+// 		return notify({
+// 			text: 'Profile update successfully',
+// 			type: 'success',
+// 		});
+// 	} catch (error) {
+// 		console.log(error);
+// 	}
+// }
 
 const checkPass = async () => {
 	if (oldPassword.value.trim() !== '' && newPassword.value.trim() !== '') {
@@ -71,12 +104,12 @@ const checkPass = async () => {
 		displayName.value.trim() !== '' ||
 		(oldPassword.value.trim() !== '' && newPassword.value.trim() !== '')
 	) {
-		await update(
-			displayName.value.trim(),
-			oldPassword.value.trim(),
-			newPassword.value.trim(),
-			email.value.trim(),
-			avatar.value?.files?.item(0),
+		await updateProfile(
+			{displayName:displayName.value.trim(),
+			oldPassword:oldPassword.value.trim(),
+			newPassword:newPassword.value.trim(),
+			email:email.value.trim(),
+			avatar:avatar.value?.files?.item(0),}
 		);
 	}
 };

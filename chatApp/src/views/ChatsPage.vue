@@ -7,7 +7,8 @@ import ChatModal from '../components/ChatModal.vue';
 import ManageChannelModal from '@/components/ManageChannelModal.vue';
 import GroupAvatar from '@/components/GroupAvatar.vue';
 import type { Channel, Media, Message } from '@/types';
-import { useQuery, useQueryClient } from '@tanstack/vue-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/vue-query';
+import { notify } from '@kyvg/vue3-notification';
 
 const authStore = useAuthStore();
 const queryClient = useQueryClient();
@@ -75,18 +76,39 @@ const getChannelDisplayName = (channel: Channel) => {
 	return channel.name;
 };
 
-const leaveChannel = async () => {
-	if (!selectedChannel.value) return;
-	try {
+const { mutateAsync: leaveChannel, isPending: isLeavingChannel } = useMutation({
+	mutationFn: async () => {
+		if (!selectedChannel.value) return;
 		await axios.delete(`/channels/${selectedChannel.value.id}/members`);
 		alert('You left the channel');
 		showChannelMenu.value = false;
 		selectedChannel.value = null;
 		refetchChannels();
-	} catch (error) {
-		console.error(error);
-	}
-};
+	},
+	onSuccess: () => {
+		notify({ text: 'Channel left successfully!', type: 'success' });
+		queryClient.setQueryData(['channels', 'list'], () => {
+			refetchChannels();
+	});
+	},
+	onError: (error: any) => {
+		console.error('Failed to leave channel:', error);
+		notify({ text: 'Failed to leave the channel', type: 'error' });
+	},
+});
+
+// const leaveChannel = async () => {
+// 	if (!selectedChannel.value) return;
+// 	try {
+// 		await axios.delete(`/channels/${selectedChannel.value.id}/members`);
+// 		alert('You left the channel');
+// 		showChannelMenu.value = false;
+// 		selectedChannel.value = null;
+// 		refetchChannels();
+// 	} catch (error) {
+// 		console.error(error);
+// 	}
+// };
 
 const openManageModal = () => {
 	manageModalOpen.value = true;
@@ -117,10 +139,10 @@ const sendMessage = async () => {
 		queryClient.setQueryData(
 			['channels', 'detail', selectedChannel.value, 'messages'],
 			(oldMessages: Message[]) => {
-				if(!oldMessages){
+				if (!oldMessages) {
 					return [response.data.data];
 				}
-				return  [...oldMessages, response.data.data];
+				return [...oldMessages, response.data.data];
 			},
 		);
 		// messages.value?.push(response.data.data);
@@ -132,28 +154,40 @@ const sendMessage = async () => {
 	}
 };
 
-const selectChannel = (channel: Channel) => {
-	selectedChannel.value = channel;
-};
-
-const sendMedia = async (media: File) => {
-	if (!selectedChannel.value) return;
-
-	try {
+const { mutateAsync: sendMedia, isPending: isLoadingMedia } = useMutation({
+	mutationFn: async (media: File) => {
+		if (!selectedChannel.value) return;
 		const formData = new FormData();
 		formData.append('file', media);
 		const response = await axios.post<{ data: Media }>('/media/temp', formData, {
 			headers: { 'Content-Type': 'multipart/form-data' },
 		});
-		if (!response) {
-			throw new Error('Unable to fetch data');
-		}
-
 		return response.data.data;
-	} catch (error) {
-		console.error(error);
-	}
+	},
+});
+
+const selectChannel = (channel: Channel) => {
+	selectedChannel.value = channel;
 };
+
+// const sendMedia = async (media: File) => {
+// 	if (!selectedChannel.value) return;
+
+// 	try {
+// 		const formData = new FormData();
+// 		formData.append('file', media);
+// 		const response = await axios.post<{ data: Media }>('/media/temp', formData, {
+// 			headers: { 'Content-Type': 'multipart/form-data' },
+// 		});
+// 		if (!response) {
+// 			throw new Error('Unable to fetch data');
+// 		}
+
+// 		return response.data.data;
+// 	} catch (error) {
+// 		console.error(error);
+// 	}
+// };
 
 // const deleteMessage = async()=>{
 // 	if (!selectedChannel.value) return;
@@ -313,7 +347,7 @@ const handleChatStarted = (newChannel: Channel) => {
 							>
 								<button
 									v-if="!isOwner"
-									@click="leaveChannel"
+									@click="leaveChannel()"
 									class="block w-full text-left px-4 py-2 hover:bg-gray-100"
 								>
 									Leave Chat

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Channel, User } from '@/types';
 import { useNotification } from '@kyvg/vue3-notification';
-import { useQuery } from '@tanstack/vue-query';
+import { useQueryClient, useQuery, useMutation } from '@tanstack/vue-query';
 import axios from 'axios';
 import { computed, defineProps, ref } from 'vue';
 
@@ -13,6 +13,7 @@ const { notify } = useNotification();
 const searchQuery = ref<string>('');
 const activeTab = ref<'chat' | 'channel'>('chat');
 const emit = defineEmits(['close', 'chat-started']);
+const queryClient = useQueryClient();
 
 const channelName = ref('');
 const onSearch = ref('');
@@ -64,6 +65,9 @@ onSearch.value = searchQuery.value;
 // 	fetchUsers(searchQuery.value);
 // };
 
+
+
+
 const openAddUsersModal = () => {
 	if (!channelName.value.trim()) {
 		alert('Please enter channel name first');
@@ -73,52 +77,74 @@ const openAddUsersModal = () => {
 };
 
 const addUser = () => {
-	if (user.value) {
-		initial_members.value = [...initial_members.value, user.value];
+	if (users?.value?.username) {
+		initial_members.value = [...initial_members.value, users.value.username];
 	} else {
-		return 'no user stored';
+		notify({ text: 'No user selected', type: 'error' });
 	}
 };
 
-const createChannel = async (
-	channelName: string,
-	channelDesc: string,
-	initial_members: string[],
-) => {
-	try {
-		const response = await axios.post<Channel>('/channels', {
+// const createChannel = async (
+// 	channelName: string,
+// 	channelDesc: string,
+// 	initial_members: string[],
+// ) => {
+// 	try {
+// 		const response = await axios.post<Channel>('/channels', {
+// 			type: 'group',
+// 			name: channelName,
+// 			description: channelDesc,
+// 			initial_members: initial_members,
+// 		});
+// 		alert('Channel created successfully!');
+// 		showAddUsersModal.value = false;
+// 	} catch (error) {
+// 		console.error('Failed to create channel:', error);
+// 	}
+// };
+
+const { mutate: createChannel, isPending: isCreatingChannel } = useMutation({
+	mutationFn: async () => {
+		return await axios.post<Channel>('/channels', {
 			type: 'group',
-			name: channelName,
-			description: channelDesc,
-			initial_members: initial_members,
+			name: channelName.value,
+			description: channelDesc.value,
+			initial_members: initial_members.value,
 		});
-		alert('Channel created successfully!');
+	},
+	onSuccess: () => {
+		notify({ text: 'Channel created successfully!', type: 'success' });
 		showAddUsersModal.value = false;
-	} catch (error) {
+		queryClient.invalidateQueries({ queryKey: ['channels'] });
+	},
+	onError: (error: any) => {
 		console.error('Failed to create channel:', error);
-	}
-};
+		notify({ text: 'Failed to create channel', type: 'error' });
+	},
+});
 
-const startChat = async (username: String) => {
-	try {
-		const response = await axios.post<Channel>('/channels', {
+const { mutate: startChat, isPending: isStartingChat } = useMutation({
+	mutationFn: async (username: string) => {
+		return await axios.post<Channel>('/channels', {
 			type: 'personal',
 			username: username,
 		});
-		notify({
-			text: 'Chat started successfully!',
-			type: 'success',
-		});
+	},
+	onSuccess: (res) => {
+		notify({ text: 'Chat started successfully!', type: 'success' });
+		emit('chat-started', res.data);
+		queryClient.invalidateQueries({ queryKey: ['channels'] });
+	},
+	onError: (error: any) => {
+		console.error('Failed to start chat:', error);
+		notify({ text: 'Failed to start chat', type: 'error' });
+	},
+});
+// const createdChannel = () => {
+// 	createChannel(channelName.value, channelDesc.value, initial_members.value);
+// };
 
-		emit('chat-started', response.data);
-	} catch (error) {
-		console.error('Failed to start a chat:', error);
-	}
-};
-
-const createdChannel = () => {
-	createChannel(channelName.value, channelDesc.value, initial_members.value);
-};
+const createdChannel = () => createChannel();
 
 const closeModal = () => {
 	emit('close');
@@ -261,6 +287,7 @@ const closeModal = () => {
 				>
 					Create Channel
 				</button>
+				
 			</div>
 		</div>
 	</div>
